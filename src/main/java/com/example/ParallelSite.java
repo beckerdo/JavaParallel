@@ -18,9 +18,11 @@ import java.util.concurrent.Future;
 import java.util.Random;
 
 /**
- * Ping N web sites in parallel. The ping simply does a GET, and looks at the
- * first header line. This example could be applied to many sorts of similar
- * tasks.
+ * Ping N web sites in parallel. The ping simply does a GET.
+ * <p>
+ * All sites are HTTP. Respone codes are checked.
+ * Response code 500 will cause pingAndReportEachWhenKnownTerminateOnFail to
+ * call ExecutorService.shutdownNow. 
  * <P>
  * No time-out is used here. As usual, be wary of warm-up of the just-in-time
  * compiler. You might want to use -Xint.
@@ -31,14 +33,18 @@ import java.util.Random;
  */
 public final class ParallelSite {
 	/** Maximum thread for parallel execution. */
-	public static final int MAX_THREADS = 4;
+	public static final int MAX_THREADS = 8;
 
 	/** Pool of sites */
 	public static final List<String> URLs = Arrays.asList(
 		"http://www.youtube.com/", "http://www.google.com/",
 		"http://www.date4j.net", "http://www.web4j.com",
 		"http://www.ebay.com", "http://www.paypal.com",
-		"http://www.apache.org", "http://www.github.com"
+		"http://www.apache.org", "http://www.github.com",
+		"http://www.facebook.com", "http://www.danbecker.info",
+		"http://www.slashdot.org", "http://www.cnn.com",
+		"http://www.boingboing.net/", "http://www.tomshardware.com/",
+		"http://www.scientificamerican.com/", "http://www.nytimes.com/"
 	);
 	public static final Random random = new Random();
 	
@@ -147,10 +153,11 @@ public final class ParallelSite {
 		ExecutorService executor = Executors.newFixedThreadPool(numThreads);
 		CompletionService<PingResult> completionService = 
 			new ExecutorCompletionService<>(executor);
-		int brokenURL = random.nextInt( URLs.size( ));
+		// int brokenURL = random.nextInt( URLs.size( ) / 2 );
 		for (int i = 0; i < URLs.size(); i++) {
 			String urlString = URLs.get(i);
 			if ( i == 0 ) {
+				// Make one URL broken
 				urlString = breakString( 7, 3, urlString );
 			}
 			Task task = new Task(urlString);
@@ -185,7 +192,7 @@ public final class ParallelSite {
 		System.out.println(String.valueOf(aMsg));
 	}
 
-	/** Try to ping a URL. Return true only if successful. */
+	/** Try to ping a URL. Return true if successful. */
 	private final class Task implements Callable<PingResult> {
 		Task(String aURL) {
 			fURL = aURL;
@@ -232,7 +239,7 @@ public final class ParallelSite {
 		return result;
 	}
 
-	/** Simple struct to hold all the date related to a ping. */
+	/** Simple struct to hold all the data related to a ping. */
 	private static final class PingResult {
 		String url;
 		Boolean success;
