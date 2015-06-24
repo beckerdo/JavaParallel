@@ -15,6 +15,7 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.Random;
 
 /**
@@ -64,7 +65,8 @@ public final class ParallelSite {
 			log("Parallel, terminate when one breaks:");
 			checker.pingAndReportEachWhenKnownTerminateOnFail();
 		} catch (InterruptedException ex) {
-			Thread.currentThread().interrupt();
+			log("Interruption occured: " + ex.getCause());
+			// Thread.currentThread().interrupt();
 		} catch (ExecutionException ex) {
 			log("Problem executing worker: " + ex.getCause());
 		} catch (MalformedURLException ex) {
@@ -158,7 +160,7 @@ public final class ParallelSite {
 			String urlString = URLs.get(i);
 			if ( i == 0 ) {
 				// Make one URL broken
-				urlString = breakString( 7, 3, urlString );
+				urlString = breakString( 10, 3, urlString );
 			}
 			Task task = new Task(urlString);
 			completionService.submit(task);
@@ -168,11 +170,14 @@ public final class ParallelSite {
 			PingResult result = future.get();
 			log(result);
 			if ( !result.success ) {
-				List<Runnable> waiting = executor.shutdownNow();
-				log( "Shutdown called. Waiting task count=" + waiting.size());
+				// List<Runnable> waiting = executor.shutdownNow(); // Interrupts all threads. Leaves a zombie.
+				// log( "Shutdown called. Waiting task count=" + waiting.size());
+				executor.shutdown(); // Waits for threads to complete
+				log( "Shutdown called." );
 			}
 		}
-		executor.shutdown(); // always reclaim resources
+		log( "Await termination." );
+		executor.awaitTermination( 6, TimeUnit.SECONDS);
 		long duration = System.currentTimeMillis() - start;
 		log("Duration: " + duration + " mS");
 	}
@@ -231,8 +236,8 @@ public final class ParallelSite {
 			}
 		} catch (Exception ex) {
 			// ignore - fails
-			// log("Bad URL: " + ex.getCause());		
 			result.success = false;
+			// log( "   Exception: " + url + " " + ex);		
 		}
 		long end = System.currentTimeMillis();
 		result.timing = end - start;
