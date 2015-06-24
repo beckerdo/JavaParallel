@@ -85,9 +85,9 @@ public final class ParallelSite {
 			ExecutionException {
 		long start = System.currentTimeMillis();
 		int numThreads = URLs.size() > MAX_THREADS ? MAX_THREADS : URLs.size(); 
-		ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+		ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
 		CompletionService<PingResult> completionService = 
-			new ExecutorCompletionService<>(executor);
+			new ExecutorCompletionService<>(executorService);
 		for (String url : URLs) {
 			Task task = new Task(url);
 			completionService.submit(task);
@@ -96,7 +96,7 @@ public final class ParallelSite {
 			Future<PingResult> future = completionService.take();
 			log(future.get());
 		}
-		executor.shutdown(); // always reclaim resources
+		executorService.shutdown(); // always reclaim resources
 		long duration = System.currentTimeMillis() - start;
 		log("Duration: " + duration + " mS");
 	}
@@ -114,13 +114,13 @@ public final class ParallelSite {
 			tasks.add(new Task(url));
 		}
 		int numThreads = URLs.size() > MAX_THREADS ? MAX_THREADS : URLs.size();
-		ExecutorService executor = Executors.newFixedThreadPool(numThreads);
-		List<Future<PingResult>> results = executor.invokeAll(tasks);
+		ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
+		List<Future<PingResult>> results = executorService.invokeAll(tasks);
 		for (Future<PingResult> result : results) {
 			PingResult pingResult = result.get();
 			log(pingResult);
 		}
-		executor.shutdown(); // always reclaim resources
+		executorService.shutdown(); // always reclaim resources
 		long duration = System.currentTimeMillis() - start;
 		log("Duration: " + duration + " mS");
 	}
@@ -152,9 +152,9 @@ public final class ParallelSite {
 			ExecutionException {
 		long start = System.currentTimeMillis();
 		int numThreads = URLs.size() > MAX_THREADS ? MAX_THREADS : URLs.size(); 
-		ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+		ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
 		CompletionService<PingResult> completionService = 
-			new ExecutorCompletionService<>(executor);
+			new ExecutorCompletionService<>(executorService);
 		// int brokenURL = random.nextInt( URLs.size( ) / 2 );
 		for (int i = 0; i < URLs.size(); i++) {
 			String urlString = URLs.get(i);
@@ -172,14 +172,38 @@ public final class ParallelSite {
 			if ( !result.success ) {
 				// List<Runnable> waiting = executor.shutdownNow(); // Interrupts all threads. Leaves a zombie.
 				// log( "Shutdown called. Waiting task count=" + waiting.size());
-				executor.shutdown(); // Waits for threads to complete
+				// executor.shutdown(); // Waits for threads to complete
 				log( "Shutdown called." );
+				shutdownAndAwaitTermination( executorService, 4 );
 			}
 		}
 		log( "Await termination." );
-		executor.awaitTermination( 6, TimeUnit.SECONDS);
+		executorService.awaitTermination( 6, TimeUnit.SECONDS);
 		long duration = System.currentTimeMillis() - start;
 		log("Duration: " + duration + " mS");
+	}
+
+	/** The following method shuts down an ExecutorService in two phases, 
+	 * first by calling shutdown to reject incoming tasks, 
+	 * and then calling shutdownNow, if necessary, to cancel any lingering tasks: 
+	 * @param pool
+	 */
+	public void shutdownAndAwaitTermination(ExecutorService pool, long delaySecs) {
+		pool.shutdown(); // Disable new tasks from being submitted
+		try {
+			// Wait a while for existing tasks to terminate
+			if (!pool.awaitTermination(delaySecs, TimeUnit.SECONDS)) {
+				pool.shutdownNow(); // Cancel currently executing tasks
+				// Wait a while for tasks to respond to being cancelled
+				if (!pool.awaitTermination(delaySecs, TimeUnit.SECONDS))
+					log("Pool did not terminate");
+			}
+		} catch (InterruptedException ie) {
+			// (Re-)Cancel if current thread also interrupted
+			pool.shutdownNow();
+			// Preserve interrupt status
+			Thread.currentThread().interrupt();
+		}
 	}
 	
 	// PRIVATE
@@ -255,4 +279,5 @@ public final class ParallelSite {
 			return "   Result:" + success + " " + timing + " msecs " + url;
 		}
 	}
+
 }
