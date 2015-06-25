@@ -177,8 +177,6 @@ public final class ParallelSite {
 				shutdownAndAwaitTermination( executorService, 4 );
 			}
 		}
-		log( "Await termination." );
-		executorService.awaitTermination( 6, TimeUnit.SECONDS);
 		long duration = System.currentTimeMillis() - start;
 		log("Duration: " + duration + " mS");
 	}

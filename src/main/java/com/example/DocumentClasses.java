@@ -1,13 +1,19 @@
 package com.example;
 
+import java.io.File;
 import java.lang.Class;
 import java.lang.reflect.*;
+import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Random;
+import java.util.Set;
 import java.util.Vector;
+
+import org.junit.runners.ParentRunner;
+import org.reflections.Reflections;
 
 /**
  * A Java introspection tool that documents a number of classes.
@@ -22,7 +28,8 @@ public final class DocumentClasses {
 			"java.lang.Runnable", "java.util.concurrent.Callable",
 			"java.util.concurrent.Executor", "java.util.concurrent.Future",
 			"java.util.concurrent.CompletionService",
-			"java.util.concurrent.Executors");
+			"java.util.concurrent.Executors",
+			"java.util.concurrent.AbstractExecutorService");
 	public static final Random random = new Random();
 
 	/** Run this tool. */
@@ -32,10 +39,52 @@ public final class DocumentClasses {
 			for (String className : CLASSNAMES) {
 				log("Class name=" + className);
 				Class clazz = Class.forName(className);
+				
+				Method [] instanceMethods = getInstanceMethods( clazz );
+				log("   Instance Methods:");
+				for ( int i = 0; i < instanceMethods.length; i++ ) {
+					Method method = instanceMethods[ i ];
+				    log("   " + i + ". " + method.getName() );
+				}
 
-			}
-		} catch (Exception ex) {
+				Method [] supportedMethods = getSupportedMethods( clazz );
+				log("   Supported Methods:");
+				for ( int i = 0; i < supportedMethods.length; i++ ) {
+					Method method = supportedMethods[ i ];
+				    log("   " + i + ". " + method.getName() );
+				}				
+
+				Class [] supers = getSuperclasses( clazz );
+				log("   Super classes:");
+				for ( int i = 0; i < supers.length; i++ ) {
+					Class superClass = supers[ i ];
+				    log("   " + i + ". " + superClass.getName() );
+				}
+
+				Class [] interfaces = getInterfaces( clazz );
+				log("   Interfaces:");
+				for ( int i = 0; i < interfaces.length; i++ ) {
+					Class myInterface = interfaces[ i ];
+				    log("   " + i + ". " + myInterface.getName() );
+				}
+
+//				Reflections reflections = new Reflections("java.util.concurrent");
+//				Set<Class<?>> classes = reflections.getSubTypesOf(clazz);
+//				if (classes.size() > 0) {
+//					log("   SubTypes:");
+//					int i = 0;
+//					for ( Class thisClass : classes ) {
+//					    log("   " + i++ + ". " + thisClass.getName() );
+//						
+//					}
+//				}
+				log( "   Subclasses:");
+				find( "java.util.concurrent", clazz );
+				log( "   Class location:");
+				which( clazz.getName() );			}
+		} catch (Throwable ex) {
 			log("Exception occured: " + ex);
+			ex.printStackTrace();
 		}
 		log("Done.");
 	}
@@ -69,6 +118,16 @@ public final class DocumentClasses {
 		return result;
 	}
 
+	/**
+	 * Returns an array of the interfaces of cls.
+	 * 
+	 * @return java.lang.Class[]
+	 * @param cls java.lang.Class
+	 */
+	public static Class[] getInterfaces(Class cls) {
+		return cls.getInterfaces();
+	}
+	
 	/**
 	 * Returns an array of the instance variables of the the specified class.
 	 * An instance variable is defined to be a non-static field that is declared
@@ -217,7 +276,6 @@ public final class DocumentClasses {
 		}
 	}
 
-	// stop extract getSupportedMethod
 	/**
 	 * Returns a Method array of the methods to which instances of the specified
 	 * respond except for those methods defined in the class specifed by limit
@@ -822,4 +880,71 @@ public final class DocumentClasses {
 		}
 		return null;
 	}
+
+    public static void find(String pckgname, Class parent) {
+        // Translate the package name into an absolute path
+        String name = new String(pckgname);
+        if (!name.startsWith("/")) {
+            name = "/" + name;
+        }        
+        name = name.replace('.','/');
+        
+        // Get a File object for the package
+        URL url = DocumentClasses.class.getResource(name);
+        if ( null != url ) {
+        File directory = new File(url.getFile());
+        // New code
+        // ======
+        if (directory.exists()) {
+            // Get the list of the files contained in the package
+            String [] files = directory.list();
+            for (int i=0;i<files.length;i++) {
+                 
+                // we are only interested in .class files
+                if (files[i].endsWith(".class")) {
+                    // removes the .class extension
+                    String classname = files[i].substring(0,files[i].length()-6);
+                    try {
+                        // Try to create an instance of the object
+                        Object o = Class.forName(pckgname+"."+classname).newInstance();
+                        // if (o instanceof parent) {
+                        if (o.getClass().isAssignableFrom(parent)) {
+                        // if ( parent.isAssignableFrom(o.getClass())) {
+                            System.out.println(classname);
+                        }
+                    } catch (ClassNotFoundException cnfex) {
+                        System.err.println(cnfex);
+                    } catch (InstantiationException iex) {
+                        // We try to instantiate an interface
+                        // or an object that does not have a 
+                        // default constructor
+                    } catch (IllegalAccessException iaex) {
+                        // The class is not public
+                    }
+                }
+            }
+        }
+        }
+    }
+
+    public static void which(String className) {   	
+    	      if (!className.startsWith("/")) {
+    	        className = "/" + className;
+    	      }
+    	      className = className.replace('.', '/');
+    	      className = className + ".class";
+    	
+    	      java.net.URL classUrl =
+    	        DocumentClasses.class.getResource(className);
+    	
+    	      if (classUrl != null) {
+    	        System.out.println("Class '" + className +
+    	          "' found in '" + classUrl.getFile() + "'");
+    	      } else {
+            System.out.println("\nClass '" + className +
+    	          "' not found in \n'" +
+    	          System.getProperty("java.class.path") + "'");
+    	      }
+        }
+    
 }
