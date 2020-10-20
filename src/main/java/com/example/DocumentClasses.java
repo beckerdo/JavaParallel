@@ -12,7 +12,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.Vector;
 
-import org.reflections.Reflections;
 
 /**
  * A Java introspection tool that documents a number of classes.
