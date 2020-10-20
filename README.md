@@ -1,2 +1,2 @@
 # JavaParallel
-A demonstration of 
+A demonstration of Executors, Concurrency, Futures, etc.
